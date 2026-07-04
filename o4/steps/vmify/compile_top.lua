@@ -199,24 +199,22 @@ return function(Compiler)
     local scope = self.activeBlock.scope
     for id in ipairs(block.scope.variables) do
       local varReg = self:getVarRegister(block.scope, id, funcDepth, nil)
-      local skipFree = self.noAutoFreeUpval and self.noAutoFreeUpval[block.scope] and self.noAutoFreeUpval[block.scope][id]
-      if self:isUpvalue(block.scope, id) and not skipFree then
-        scope:addReferenceToHigherScope(self.scope, self.freeUpvalVar)
-        self:addStatement(
-          self:setRegister(scope, varReg,
-            A.FunctionCallExpression(A.VariableExpression(self.scope, self.freeUpvalVar), {
-              self:register(scope, varReg)
-            })
-          ), {varReg}, {varReg}, false
-        )
-      elseif not skipFree then
-        self:addStatement(
-          self:setRegister(scope, varReg, A.NilExpression()),
-          {varReg}, {}, false
-        )
-      end
+      -- Note: we deliberately don't runtime-free upvalue boxes here (via
+      -- freeUpvalVar), even for variables marked isUpvalue. A closure
+      -- created in this block may have captured the box and can still be
+      -- called after the block's static extent ends -- e.g. a recursive
+      -- `local function`, or any closure returned/stored somewhere before
+      -- this block exits. Freeing the box here would wipe that value out
+      -- from under a closure that hasn't run yet. Just clear the local
+      -- register that held the box id/value; the box itself (and any
+      -- closure still holding its id) stays alive for the rest of the
+      -- program's run.
+      self:addStatement(
+        self:setRegister(scope, varReg, A.NilExpression()),
+        {varReg}, {}, false
+      )
       self:freeRegister(varReg, true)
     end
   end
 
-end
+end -- UwU
