@@ -20,12 +20,13 @@ return function(self, stmt, funcDepth)
 
   for id in ipairs(stmt.body.scope.variables) do
     local varReg = self:getVarRegister(stmt.body.scope, id, funcDepth, nil)
-    if self:isUpvalue(stmt.body.scope, id) then
-      scope:addReferenceToHigherScope(self.scope, self.freeUpvalVar)
-      self:addStatement(self:setRegister(scope, varReg, A.FunctionCallExpression(A.VariableExpression(self.scope, self.freeUpvalVar), { self:register(scope, varReg) })), {varReg}, {varReg}, false)
-    else
-      self:addStatement(self:setRegister(scope, varReg, A.NilExpression()), {varReg}, {}, false)
-    end
+    -- Note: we deliberately don't runtime-free upvalue boxes here (via
+    -- freeUpvalVar) even for variables marked isUpvalue. A closure created
+    -- during this iteration may have captured this box and can still be
+    -- called after the loop exits (e.g. stored in a table) -- freeing the
+    -- box here would wipe that value out from under it. Just clear the
+    -- local register that held the box id/value.
+    self:addStatement(self:setRegister(scope, varReg, A.NilExpression()), {varReg}, {}, false)
     self:freeRegister(varReg, true)
   end
   self:_setActiveBlock(finalBlock)
